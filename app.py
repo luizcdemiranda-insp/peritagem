@@ -320,8 +320,7 @@ elif st.session_state['modulo_ativo'] == 'Peritagem':
                 elif len(fotos_anexadas) == 0:
                     st.warning("⚠️ É recomendável anexar ao menos uma foto do equipamento.")
                 else:
-                    # Se passou na validação, salvamos temporariamente no Session State
-                    st.session_state['dados_peritagem_atual'] = {
+                    dados_compilados = {
                         "id": st.session_state['id_selecionado'],
                         "notas_visuais": notas_visuais,
                         "tampas": tampas_status,
@@ -330,12 +329,33 @@ elif st.session_state['modulo_ativo'] == 'Peritagem':
                         "ip": indice_polarizacao,
                         "dar": absorcao_dieletrica,
                         "estufa": requer_estufa,
-                        "fotos": fotos_anexadas # Lista de objetos UploadedFile
                     }
                     
-                    st.success(f"✅ Peritagem da ID {st.session_state['id_selecionado']} validada com sucesso!")
-                    st.info("No próximo módulo, acionaremos a geração do PDF e a API do Google Sheets/Drive aqui.")
-                    # st.balloons() # Um toque de gamificação opcional ao finalizar
+                    # Fluxo de Integração com feedback visual
+                    try:
+                        with st.spinner("📄 Gerando Laudo em PDF..."):
+                            pdf_bytes = gerar_pdf_peritagem(dados_compilados)
+                            
+                        with st.spinner("☁️ Localizando pasta e enviando para o Google Drive..."):
+                            link_pasta = upload_para_drive(dados_compilados['id'], pdf_bytes)
+                            
+                        with st.spinner("📊 Movendo card e atualizando Google Sheets..."):
+                            mover_linha_sheets(dados_compilados['id'])
+                            
+                        # Limpa o estado e exibe o sucesso
+                        st.success(f"✅ Peritagem da ID {dados_compilados['id']} concluída com sucesso!")
+                        st.markdown(f"**Arquivos salvos na pasta do Drive:** [Acessar Pasta]({link_pasta})")
+                        
+                        # Retorna para a lista após 3 segundos
+                        time.sleep(3)
+                        st.session_state['etapa_peritagem'] = 'lista_ids'
+                        st.session_state['id_selecionado'] = None
+                        st.rerun()
+                        
+                    except Exception as e:
+                        # Amortecedor Crítico: Captura falhas de API sem quebrar a tela vermelha do Streamlit
+                        st.error(f"❌ Ocorreu um erro durante a integração: {str(e)}")
+                        st.info("Os dados do formulário foram mantidos. Tente submeter novamente.")
 
 elif st.session_state['modulo_ativo'] == 'Configurações':
     st.title("⚙️ Configurações do Sistema")
