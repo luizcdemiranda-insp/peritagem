@@ -137,9 +137,9 @@ def gerar_pdf_peritagem(dados):
     pdf.cell(0, 8, f"Requer Ciclo de Secagem em Estufa: {estufa_txt}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(5)
     
-    # Retorna o PDF como bytes para upload no Drive
-    # Em um ambiente real, você pode adicionar a lógica para plugar os bytes das fotos aqui (pdf.image())
-    return pdf.output(dest="S").encode("latin-1", errors="replace")
+    # Retorna o PDF como bytes (fpdf2 já faz isso nativamente)
+    # Em um ambiente real, você pode adicionar a lógica para plugar as fotos aqui
+    return bytes(pdf.output())
 
 def upload_para_drive(id_pipedrive, pdf_bytes):
     """
