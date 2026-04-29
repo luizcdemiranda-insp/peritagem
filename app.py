@@ -205,7 +205,72 @@ elif st.session_state['modulo_ativo'] == 'Peritagem':
             st.title(f"🛠️ Peritagem: {st.session_state['id_selecionado']}")
             
         st.divider()
-        st.info("Aqui vamos construir os campos do formulário (fotos, dados digitáveis, etc.) no próximo módulo.")
+        
+        # --- FORMULÁRIO DE PERITAGEM ---
+        # Utilizando st.form para empacotar os dados e evitar reruns desnecessários
+        with st.form(key="form_peritagem", clear_on_submit=False):
+            st.markdown("<h3 style='color: #ff9800;'>1. Inspeção Visual e Mecânica</h3>", unsafe_allow_html=True)
+            notas_visuais = st.text_area("Descreva as condições gerais do equipamento (sujeira, oxidação, danos visíveis nas bobinas):")
+            
+            col_mecanica1, col_mecanica2 = st.columns(2)
+            with col_mecanica1:
+                tampas_status = st.selectbox("Condição das Tampas/Mancais:", ["Bom", "Avariado", "Requer Usinagem"])
+            with col_mecanica2:
+                eixo_status = st.selectbox("Condição do Eixo/Rotor:", ["Bom", "Desgaste Acentuado", "Empenado"])
+
+            st.markdown("<h3 style='color: #ff9800; margin-top: 20px;'>2. Ensaios Elétricos Iniciais</h3>", unsafe_allow_html=True)
+            col_eletrica1, col_eletrica2 = st.columns(2)
+            
+            with col_eletrica1:
+                st.markdown("<p style='color: #b0b4c4; margin-bottom:0;'>Resistência Ôhmica (mΩ)</p>", unsafe_allow_html=True)
+                resistencia_u = st.number_input("Fase U", min_value=0.0, format="%.2f")
+                resistencia_v = st.number_input("Fase V", min_value=0.0, format="%.2f")
+                resistencia_w = st.number_input("Fase W", min_value=0.0, format="%.2f")
+                
+            with col_eletrica2:
+                st.markdown("<p style='color: #b0b4c4; margin-bottom:0;'>Medições de Isolamento (Megôhmetro)</p>", unsafe_allow_html=True)
+                indice_polarizacao = st.number_input("Índice de Polarização (IP)", min_value=0.0, format="%.2f", help="Relação 10 min / 1 min (Ref. IEEE 43-2024)")
+                absorcao_dieletrica = st.number_input("Absorção Dielétrica (DAR)", min_value=0.0, format="%.2f", help="Relação 60 seg / 30 seg")
+                
+                # Checkbox para decisão técnica
+                st.markdown("<br>", unsafe_allow_html=True)
+                requer_estufa = st.checkbox("Requer ciclo de secagem em estufa?")
+
+            st.markdown("<h3 style='color: #ff9800; margin-top: 20px;'>3. Registro Fotográfico</h3>", unsafe_allow_html=True)
+            fotos_anexadas = st.file_uploader(
+                "Anexe as fotos da peritagem (Múltiplos arquivos permitidos)", 
+                type=["png", "jpg", "jpeg"], 
+                accept_multiple_files=True
+            )
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Botão de submissão do formulário
+            submit_peritagem = st.form_submit_button("💾 Salvar Peritagem e Gerar PDF", type="primary")
+            
+            if submit_peritagem:
+                # BOAS PRÁTICAS: Amortecedor de Validação de Dados
+                if not notas_visuais.strip():
+                    st.error("⚠️ As notas de inspeção visual são obrigatórias.")
+                elif len(fotos_anexadas) == 0:
+                    st.warning("⚠️ É recomendável anexar ao menos uma foto do equipamento.")
+                else:
+                    # Se passou na validação, salvamos temporariamente no Session State
+                    st.session_state['dados_peritagem_atual'] = {
+                        "id": st.session_state['id_selecionado'],
+                        "notas_visuais": notas_visuais,
+                        "tampas": tampas_status,
+                        "eixo": eixo_status,
+                        "resistencia": {"U": resistencia_u, "V": resistencia_v, "W": resistencia_w},
+                        "ip": indice_polarizacao,
+                        "dar": absorcao_dieletrica,
+                        "estufa": requer_estufa,
+                        "fotos": fotos_anexadas # Lista de objetos UploadedFile
+                    }
+                    
+                    st.success(f"✅ Peritagem da ID {st.session_state['id_selecionado']} validada com sucesso!")
+                    st.info("No próximo módulo, acionaremos a geração do PDF e a API do Google Sheets/Drive aqui.")
+                    # st.balloons() # Um toque de gamificação opcional ao finalizar
 
 elif st.session_state['modulo_ativo'] == 'Configurações':
     st.title("⚙️ Configurações do Sistema")
