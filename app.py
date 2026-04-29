@@ -131,7 +131,7 @@ def gerar_pdf_peritagem(dados):
     pdf.cell(0, 10, "2. Ensaios Elétricos e Isolamento", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("helvetica", "", 10)
     res = dados['resistencia']
-    pdf.cell(0, 8, f"Resistência Ôhmica (mΩ) -> Fase U: {res['U']} | Fase V: {res['V']} | Fase W: {res['W']}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, f"Resistência Ôhmica (mOhm) -> Fase U: {res['U']} | Fase V: {res['V']} | Fase W: {res['W']}", new_x="LMARGIN", new_y="NEXT")
     pdf.cell(0, 8, f"Índice de Polarização (IP): {dados['ip']} | Absorção Dielétrica (DAR): {dados['dar']}", new_x="LMARGIN", new_y="NEXT")
     estufa_txt = "Sim" if dados['estufa'] else "Não"
     pdf.cell(0, 8, f"Requer Ciclo de Secagem em Estufa: {estufa_txt}", new_x="LMARGIN", new_y="NEXT")
@@ -287,7 +287,7 @@ elif st.session_state['modulo_ativo'] == 'Peritagem':
             col_eletrica1, col_eletrica2 = st.columns(2)
             
             with col_eletrica1:
-                st.markdown("<p style='color: #b0b4c4; margin-bottom:0;'>Resistência Ôhmica (mΩ)</p>", unsafe_allow_html=True)
+                st.markdown("<p style='color: #b0b4c4; margin-bottom:0;'>Resistência Ôhmica (mOhm)</p>", unsafe_allow_html=True)
                 resistencia_u = st.number_input("Fase U", min_value=0.0, format="%.2f")
                 resistencia_v = st.number_input("Fase V", min_value=0.0, format="%.2f")
                 resistencia_w = st.number_input("Fase W", min_value=0.0, format="%.2f")
