@@ -139,6 +139,9 @@ def carregar_dados_pendentes():
         sheet = client.open_by_key(SHEET_ID).worksheet(NOME_ABA_PENDENTES)
         
         dados = sheet.get_all_records()
+        # --- RASTREADOR (Apagaremos depois) ---
+        st.write("Dados puros do Google:", dados)
+        # --------------------------------------
         df = pd.DataFrame(dados)
         
         if df.empty:
