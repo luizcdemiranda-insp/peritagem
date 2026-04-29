@@ -132,31 +132,30 @@ with st.sidebar:
 
 # --- CARGA DE DADOS (GOOGLE SHEETS REAL) ---
 @st.cache_data(ttl=60) # Amortecedor: Recarrega a cada 60s para não esgotar a cota da API
+# --- CARGA DE DADOS (GOOGLE SHEETS REAL) ---
+@st.cache_data(ttl=60)
 def carregar_dados_pendentes():
-    try:
-        creds = get_google_credentials()
-        client = gspread.authorize(creds)
-        sheet = client.open_by_key(SHEET_ID).worksheet(NOME_ABA_PENDENTES)
-        
-        dados = sheet.get_all_records()
-        # --- RASTREADOR (Apagaremos depois) ---
-        st.write("Dados puros do Google:", dados)
-        # --------------------------------------
-        df = pd.DataFrame(dados)
-        
-        if df.empty:
-            return pd.DataFrame()
-            
-        colunas_obrigatorias = ['ID_Pipedrive', 'Cliente', 'Equipamento', 'Status', 'Data_Entrada']
-        for col in colunas_obrigatorias:
-            if col not in df.columns:
-                df[col] = "N/D" 
-                
-        df['Data_Entrada'] = pd.to_datetime(df['Data_Entrada'], errors='coerce')
-        return df
-    except Exception as e:
-        st.error(f"Erro de conexão com a planilha: {str(e)}")
+    # Retiramos o try/except para expor o erro real da API
+    creds = get_google_credentials()
+    client = gspread.authorize(creds)
+    
+    # Se falhar nesta linha, o erro será WorksheetNotFound (nome da aba errado) 
+    # ou SpreadsheetNotFound (botão compartilhar não foi configurado)
+    sheet = client.open_by_key(SHEET_ID).worksheet(NOME_ABA_PENDENTES)
+    
+    dados = sheet.get_all_records()
+    df = pd.DataFrame(dados)
+    
+    if df.empty:
         return pd.DataFrame()
+        
+    colunas_obrigatorias = ['ID_Pipedrive', 'Cliente', 'Equipamento', 'Status', 'Data_Entrada']
+    for col in colunas_obrigatorias:
+        if col not in df.columns:
+            df[col] = "N/D" 
+            
+    df['Data_Entrada'] = pd.to_datetime(df['Data_Entrada'], errors='coerce')
+    return df
 
 # --- ROTEAMENTO DE PÁGINAS ---
 if st.session_state['modulo_ativo'] == 'Dashboard':
