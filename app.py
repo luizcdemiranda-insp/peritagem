@@ -98,6 +98,71 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- INTEGRAÇÕES E PDF (MÓDULO 4) ---
+from fpdf import FPDF
+import io
+import time
+
+def gerar_pdf_peritagem(dados):
+    """
+    Gera o laudo técnico em PDF.
+    Amortecedor: Tratamento de encoding e fallback para imagens ausentes.
+    """
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("helvetica", "B", 16)
+    
+    # Cabeçalho
+    pdf.cell(0, 10, f"LAUDO DE PERITAGEM TÉCNICA - ID: {dados['id']}", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.line(10, 25, 200, 25)
+    pdf.ln(10)
+    
+    # Seção 1: Visual e Mecânica
+    pdf.set_font("helvetica", "B", 12)
+    pdf.cell(0, 10, "1. Inspeção Visual e Mecânica", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("helvetica", "", 10)
+    pdf.multi_cell(0, 8, f"Notas Visuais: {dados['notas_visuais']}")
+    pdf.cell(0, 8, f"Condição das Tampas/Mancais: {dados['tampas']}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, f"Condição do Eixo/Rotor: {dados['eixo']}", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+    
+    # Seção 2: Ensaios Elétricos
+    pdf.set_font("helvetica", "B", 12)
+    pdf.cell(0, 10, "2. Ensaios Elétricos e Isolamento", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("helvetica", "", 10)
+    res = dados['resistencia']
+    pdf.cell(0, 8, f"Resistência Ôhmica (mΩ) -> Fase U: {res['U']} | Fase V: {res['V']} | Fase W: {res['W']}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, f"Índice de Polarização (IP): {dados['ip']} | Absorção Dielétrica (DAR): {dados['dar']}", new_x="LMARGIN", new_y="NEXT")
+    estufa_txt = "Sim" if dados['estufa'] else "Não"
+    pdf.cell(0, 8, f"Requer Ciclo de Secagem em Estufa: {estufa_txt}", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+    
+    # Retorna o PDF como bytes para upload no Drive
+    # Em um ambiente real, você pode adicionar a lógica para plugar os bytes das fotos aqui (pdf.image())
+    return pdf.output(dest="S").encode("latin-1", errors="replace")
+
+def upload_para_drive(id_pipedrive, pdf_bytes):
+    """
+    Simula a busca da pasta com o nome da ID e o upload do PDF.
+    """
+    # Amortecedor de API: Simulação de delay de rede
+    time.sleep(1.5)
+    # Lógica real futura: 
+    # 1. service.files().list(q=f"name='{id_pipedrive}' and mimeType='application/vnd.google-apps.folder'").execute()
+    # 2. MediaIoBaseUpload() e service.files().create()
+    return f"https://drive.google.com/drive/folders/mock_{id_pipedrive}"
+
+def mover_linha_sheets(id_pipedrive):
+    """
+    Simula a movimentação da linha da aba 'Pendentes' para 'Concluídos'.
+    """
+    # Amortecedor de API: Simulação de delay de rede
+    time.sleep(1)
+    # Lógica real futura:
+    # 1. gc = gspread.service_account(filename='credentials.json')
+    # 2. sh = gc.open_by_url('URL_DA_PLANILHA')
+    # 3. Ler linha de worksheet('Pendentes'), fazer append em worksheet('Concluídos'), deletar de 'Pendentes'
+    return True
 
 # --- NAVEGAÇÃO ---
 with st.sidebar:
