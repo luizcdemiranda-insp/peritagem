@@ -1,5 +1,18 @@
 import streamlit as st
 import pandas as pd
+from fpdf import FPDF
+import io
+import time
+import gspread
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+
+# --- IDs DOS REPOSITÓRIOS ---
+DRIVE_FOLDER_ID = '15QEhRK73JSdpw_-vcwsiHF6uF7oGDxQi'
+SHEET_ID = '1UoaCSwkFaVoYuAW__VwBordISIaCq2mIR_3b5onTS3I'
+NOME_ABA_PENDENTES = 'Pendentes' # Ajuste para o nome real da sua aba
+NOME_ABA_CONCLUIDOS = 'Concluidos' # Ajuste para o nome real da sua aba
 
 # --- CONFIGURAÇÃO ---
 st.set_page_config(
@@ -15,109 +28,41 @@ if 'modulo_ativo' not in st.session_state:
 if 'id_selecionado' not in st.session_state:
     st.session_state['id_selecionado'] = None
 if 'etapa_peritagem' not in st.session_state:
-    st.session_state['etapa_peritagem'] = 'lista_ids' # Controla se estamos vendo os cards ou o formulário
+    st.session_state['etapa_peritagem'] = 'lista_ids'
 
 # --- IDENTIDADE VISUAL E CSS ---
-# Aplicando o Tema Dark Elegante e os estilos de UI/UX
 st.markdown("""
     <style>
-    /* Fundo geral da aplicação e cor de texto base */
-    .stApp {
-        background-color: #0a192f;
-        color: #e0e0e0;
-    }
-    
-    /* Fundo do Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: #112240;
-        border-right: 1px solid #233554;
-    }
-    
-    /* Textos genéricos */
-    p, h1, h2, h3, h4, h5, h6 {
-        color: #e0e0e0 !important;
-    }
-
-    /* Ocultar a 'bolinha' nativa do st.radio e customizar o layout do menu */
-    div[role="radiogroup"] > label > div:first-child {
-        display: none !important;
-    }
-    div[role="radiogroup"] > label {
-        padding: 12px 15px;
-        border-radius: 8px;
-        margin-bottom: 5px;
-        color: #b0b4c4 !important;
-        border-left: 4px solid transparent;
-        background-color: transparent;
-        transition: all 0.3s ease;
-        cursor: pointer;
-        width: 100%;
-    }
-    /* Efeito Hover nos itens do menu */
-    div[role="radiogroup"] > label:hover {
-        background-color: rgba(255, 152, 0, 0.1);
-        color: #ff9800 !important;
-    }
-    /* Item Selecionado no menu */
-    div[role="radiogroup"] > label[data-checked="true"] {
-        border-left: 4px solid #ff9800;
-        background-color: #112240;
-        color: #ff9800 !important;
-        box-shadow: 0 0 15px rgba(255, 152, 0, 0.5);
-    }
-
-    /* Customização dos Cards (Mini KPIs e Dados) que usaremos depois */
-    .tempermar-card {
-        background-color: #112240;
-        border: 1px solid #233554;
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .tempermar-card:hover {
-        transform: scale(1.02);
-        box-shadow: 0 0 15px rgba(255, 152, 0, 0.3);
-        border-color: #ff9800;
-    }
-    
-    /* Customização de botões padrão */
-    .stButton > button {
-        width: 100%;
-        border-radius: 8px;
-        border: 1px solid #233554;
-        background-color: #112240;
-        color: #e0e0e0;
-        transition: all 0.3s;
-    }
-    .stButton > button:hover {
-        border-color: #ff9800;
-        color: #ff9800;
-        box-shadow: 0 0 15px rgba(255, 152, 0, 0.5);
-    }
+    .stApp { background-color: #0a192f; color: #e0e0e0; }
+    [data-testid="stSidebar"] { background-color: #112240; border-right: 1px solid #233554; }
+    p, h1, h2, h3, h4, h5, h6 { color: #e0e0e0 !important; }
+    div[role="radiogroup"] > label > div:first-child { display: none !important; }
+    div[role="radiogroup"] > label { padding: 12px 15px; border-radius: 8px; margin-bottom: 5px; color: #b0b4c4 !important; border-left: 4px solid transparent; background-color: transparent; transition: all 0.3s ease; cursor: pointer; width: 100%; }
+    div[role="radiogroup"] > label:hover { background-color: rgba(255, 152, 0, 0.1); color: #ff9800 !important; }
+    div[role="radiogroup"] > label[data-checked="true"] { border-left: 4px solid #ff9800; background-color: #112240; color: #ff9800 !important; box-shadow: 0 0 15px rgba(255, 152, 0, 0.5); }
+    .tempermar-card { background-color: #112240; border: 1px solid #233554; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .tempermar-card:hover { transform: scale(1.02); box-shadow: 0 0 15px rgba(255, 152, 0, 0.3); border-color: #ff9800; }
+    .stButton > button { width: 100%; border-radius: 8px; border: 1px solid #233554; background-color: #112240; color: #e0e0e0; transition: all 0.3s; }
+    .stButton > button:hover { border-color: #ff9800; color: #ff9800; box-shadow: 0 0 15px rgba(255, 152, 0, 0.5); }
     </style>
 """, unsafe_allow_html=True)
 
-# --- INTEGRAÇÕES E PDF (MÓDULO 4) ---
-from fpdf import FPDF
-import io
-import time
+# --- INTEGRAÇÕES E PDF (MÓDULO 4 REAL) ---
+@st.cache_resource
+def get_google_credentials():
+    """Amortecedor de Credenciais: Puxa os dados seguros do Streamlit Secrets"""
+    scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
+    return creds
 
 def gerar_pdf_peritagem(dados):
-    """
-    Gera o laudo técnico em PDF.
-    Amortecedor: Tratamento de encoding e fallback para imagens ausentes.
-    """
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("helvetica", "B", 16)
-    
-    # Cabeçalho
     pdf.cell(0, 10, f"LAUDO DE PERITAGEM TÉCNICA - ID: {dados['id']}", align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.line(10, 25, 200, 25)
     pdf.ln(10)
     
-    # Seção 1: Visual e Mecânica
     pdf.set_font("helvetica", "B", 12)
     pdf.cell(0, 10, "1. Inspeção Visual e Mecânica", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("helvetica", "", 10)
@@ -126,7 +71,6 @@ def gerar_pdf_peritagem(dados):
     pdf.cell(0, 8, f"Condição do Eixo/Rotor: {dados['eixo']}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(5)
     
-    # Seção 2: Ensaios Elétricos
     pdf.set_font("helvetica", "B", 12)
     pdf.cell(0, 10, "2. Ensaios Elétricos e Isolamento", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("helvetica", "", 10)
@@ -137,78 +81,79 @@ def gerar_pdf_peritagem(dados):
     pdf.cell(0, 8, f"Requer Ciclo de Secagem em Estufa: {estufa_txt}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(5)
     
-    # Retorna o PDF como bytes (fpdf2 já faz isso nativamente)
-    # Em um ambiente real, você pode adicionar a lógica para plugar as fotos aqui
     return bytes(pdf.output())
 
 def upload_para_drive(id_pipedrive, pdf_bytes):
-    """
-    Simula a busca da pasta com o nome da ID e o upload do PDF.
-    """
-    # Amortecedor de API: Simulação de delay de rede
-    time.sleep(1.5)
-    # Lógica real futura: 
-    # 1. service.files().list(q=f"name='{id_pipedrive}' and mimeType='application/vnd.google-apps.folder'").execute()
-    # 2. MediaIoBaseUpload() e service.files().create()
-    return f"https://drive.google.com/drive/folders/mock_{id_pipedrive}"
+    creds = get_google_credentials()
+    service = build('drive', 'v3', credentials=creds)
+    
+    # Amortecedor de Busca: Tenta achar a pasta com o nome da ID criada pela Pluga
+    query = f"name='{id_pipedrive}' and '{DRIVE_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+    results = service.files().list(q=query, fields="files(id, name)").execute()
+    items = results.get('files', [])
+    
+    # Se achar a subpasta, salva nela. Se não achar, salva na pasta raiz fornecida.
+    pasta_destino = items[0]['id'] if items else DRIVE_FOLDER_ID
+        
+    file_metadata = {
+        'name': f'Laudo_Peritagem_{id_pipedrive}.pdf',
+        'parents': [pasta_destino]
+    }
+    media = MediaIoBaseUpload(io.BytesIO(pdf_bytes), mimetype='application/pdf', resumable=True)
+    file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+    
+    return file.get('webViewLink')
 
 def mover_linha_sheets(id_pipedrive):
-    """
-    Simula a movimentação da linha da aba 'Pendentes' para 'Concluídos'.
-    """
-    # Amortecedor de API: Simulação de delay de rede
-    time.sleep(1)
-    # Lógica real futura:
-    # 1. gc = gspread.service_account(filename='credentials.json')
-    # 2. sh = gc.open_by_url('URL_DA_PLANILHA')
-    # 3. Ler linha de worksheet('Pendentes'), fazer append em worksheet('Concluídos'), deletar de 'Pendentes'
+    creds = get_google_credentials()
+    client = gspread.authorize(creds)
+    doc = client.open_by_key(SHEET_ID)
+    
+    aba_pendentes = doc.worksheet(NOME_ABA_PENDENTES)
+    aba_concluidos = doc.worksheet(NOME_ABA_CONCLUIDOS)
+    
+    # Amortecedor: Encontrar a linha baseada no ID e mover
+    cell = aba_pendentes.find(id_pipedrive)
+    if cell:
+        linha_dados = aba_pendentes.row_values(cell.row)
+        aba_concluidos.append_row(linha_dados)
+        aba_pendentes.delete_rows(cell.row)
     return True
 
 # --- NAVEGAÇÃO ---
 with st.sidebar:
     st.markdown("### 🧭 Menu Principal")
-    
-    # Menu via st.radio com CSS customizado
     menu_opcoes = ['Dashboard', 'Peritagem', 'Configurações']
-    escolha = st.radio(
-        "Navegação", 
-        menu_opcoes, 
-        label_visibility="collapsed", 
-        index=menu_opcoes.index(st.session_state['modulo_ativo'])
-    )
+    escolha = st.radio("Navegação", menu_opcoes, label_visibility="collapsed", index=menu_opcoes.index(st.session_state['modulo_ativo']))
     
-    # Atualiza o estado da navegação
     if escolha != st.session_state['modulo_ativo']:
         st.session_state['modulo_ativo'] = escolha
         st.rerun()
 
-# --- CARGA DE DADOS (SIMULAÇÃO SHEETS) ---
-@st.cache_data
+# --- CARGA DE DADOS (GOOGLE SHEETS REAL) ---
+@st.cache_data(ttl=60) # Amortecedor: Recarrega a cada 60s para não esgotar a cota da API
 def carregar_dados_pendentes():
-    # Simulando os dados que viriam do Google Sheets alimentado pelo Pipedrive/Pluga
-    dados_mock = {
-        'ID_Pipedrive': ['PRJ-1045', 'PRJ-1046', 'PRJ-1047', 'PRJ-1048'],
-        'Cliente': ['Indústria Alpha', 'Ferroviária Central', 'Mineradora Sul', 'Usina Norte'],
-        'Equipamento': ['Motor AT 4.16kV', 'Alternador EMD 420N6', 'Transformador 500kVA', 'Motor 380V'],
-        'Status': ['Aguardando Peritagem', 'Aguardando Peritagem', 'Atrasado', 'Aguardando Peritagem'],
-        'Data_Entrada': ['2026-04-28', '2026-04-29', '2026-04-20', '2026-04-29']
-    }
-    df = pd.DataFrame(dados_mock)
-    
-    # BOAS PRÁTICAS: Amortecedor 1 - Verifica se DataFrame está vazio
-    if df.empty:
-        return pd.DataFrame()
+    try:
+        creds = get_google_credentials()
+        client = gspread.authorize(creds)
+        sheet = client.open_by_key(SHEET_ID).worksheet(NOME_ABA_PENDENTES)
         
-    # BOAS PRÁTICAS: Amortecedor 2 - Garantir que as colunas essenciais existam
-    colunas_obrigatorias = ['ID_Pipedrive', 'Cliente', 'Equipamento', 'Status', 'Data_Entrada']
-    for col in colunas_obrigatorias:
-        if col not in df.columns:
-            df[col] = "N/D" # Preenche com Não Disponível para evitar quebra de UI
+        dados = sheet.get_all_records()
+        df = pd.DataFrame(dados)
+        
+        if df.empty:
+            return pd.DataFrame()
             
-    # BOAS PRÁTICAS: Amortecedor 3 - Tratamento seguro de datas
-    df['Data_Entrada'] = pd.to_datetime(df['Data_Entrada'], errors='coerce')
-    
-    return df
+        colunas_obrigatorias = ['ID_Pipedrive', 'Cliente', 'Equipamento', 'Status', 'Data_Entrada']
+        for col in colunas_obrigatorias:
+            if col not in df.columns:
+                df[col] = "N/D" 
+                
+        df['Data_Entrada'] = pd.to_datetime(df['Data_Entrada'], errors='coerce')
+        return df
+    except Exception as e:
+        st.error(f"Erro de conexão com a planilha: {str(e)}")
+        return pd.DataFrame()
 
 # --- ROTEAMENTO DE PÁGINAS ---
 if st.session_state['modulo_ativo'] == 'Dashboard':
@@ -216,29 +161,23 @@ if st.session_state['modulo_ativo'] == 'Dashboard':
     st.write("Aqui entrarão os Mini KPIs com bordas de status coloridas.")
 
 elif st.session_state['modulo_ativo'] == 'Peritagem':
-    
-    # Lógica de Roteamento Interno do Módulo (Master/Detail)
     if st.session_state['etapa_peritagem'] == 'lista_ids':
         st.title("📋 Área de Peritagem")
         st.markdown("<p style='color: #b0b4c4;'>Selecione uma ID pendente para iniciar o preenchimento.</p>", unsafe_allow_html=True)
         st.divider()
         
-        df_pendentes = carregar_dados_pendentes()
+        with st.spinner("Sincronizando com Google Sheets..."):
+            df_pendentes = carregar_dados_pendentes()
         
-        # Amortecedor de UI: Se não houver dados, exibe mensagem amigável e para a execução
         if df_pendentes.empty:
-            st.info("Nenhuma peritagem pendente no momento.")
+            st.info("Nenhuma peritagem pendente no momento ou a planilha está vazia.")
             st.stop()
             
-        # Renderização em Grid (Cards Responsivos)
         cols = st.columns(3)
         for index, row in df_pendentes.iterrows():
-            col = cols[index % 3] # Distribui os cards nas 3 colunas
+            col = cols[index % 3]
             with col:
-                # Regra de cor para a borda inferior (UI/UX dinâmico)
                 cor_borda = "#ff4b4b" if row['Status'] == 'Atrasado' else "#ff9800"
-                
-                # Injeção do HTML do Card puxando as classes do Módulo 1
                 html_card = f"""
                 <div class="tempermar-card" style="margin-bottom: 10px; border-bottom: 4px solid {cor_borda};">
                     <h3 style="margin-top:0; color: #ff9800; font-size: 1.2rem;">ID: {row['ID_Pipedrive']}</h3>
@@ -251,14 +190,12 @@ elif st.session_state['modulo_ativo'] == 'Peritagem':
                 """
                 st.markdown(html_card, unsafe_allow_html=True)
                 
-                # Botão nativo colado abaixo do card para engatilhar a ação
                 if st.button(f"Abrir Peritagem", key=f"btn_{row['ID_Pipedrive']}", type="primary"):
                     st.session_state['id_selecionado'] = row['ID_Pipedrive']
                     st.session_state['etapa_peritagem'] = 'formulario'
-                    st.rerun() # Atualiza a tela imediatamente sem quebrar o layout
+                    st.rerun()
                     
     elif st.session_state['etapa_peritagem'] == 'formulario':
-        # Cabeçalho do formulário com botão de voltar blindado via callback
         col_voltar, col_titulo = st.columns([1, 4])
         with col_voltar:
             if st.button("⬅️ Voltar"):
@@ -271,11 +208,9 @@ elif st.session_state['modulo_ativo'] == 'Peritagem':
             
         st.divider()
         
-        # --- FORMULÁRIO DE PERITAGEM ---
-        # Utilizando st.form para empacotar os dados e evitar reruns desnecessários
         with st.form(key="form_peritagem", clear_on_submit=False):
             st.markdown("<h3 style='color: #ff9800;'>1. Inspeção Visual e Mecânica</h3>", unsafe_allow_html=True)
-            notas_visuais = st.text_area("Descreva as condições gerais do equipamento (sujeira, oxidação, danos visíveis nas bobinas):")
+            notas_visuais = st.text_area("Descreva as condições gerais do equipamento:")
             
             col_mecanica1, col_mecanica2 = st.columns(2)
             with col_mecanica1:
@@ -294,27 +229,18 @@ elif st.session_state['modulo_ativo'] == 'Peritagem':
                 
             with col_eletrica2:
                 st.markdown("<p style='color: #b0b4c4; margin-bottom:0;'>Medições de Isolamento (Megôhmetro)</p>", unsafe_allow_html=True)
-                indice_polarizacao = st.number_input("Índice de Polarização (IP)", min_value=0.0, format="%.2f", help="Relação 10 min / 1 min (Ref. IEEE 43-2024)")
-                absorcao_dieletrica = st.number_input("Absorção Dielétrica (DAR)", min_value=0.0, format="%.2f", help="Relação 60 seg / 30 seg")
-                
-                # Checkbox para decisão técnica
+                indice_polarizacao = st.number_input("Índice de Polarização (IP)", min_value=0.0, format="%.2f")
+                absorcao_dieletrica = st.number_input("Absorção Dielétrica (DAR)", min_value=0.0, format="%.2f")
                 st.markdown("<br>", unsafe_allow_html=True)
                 requer_estufa = st.checkbox("Requer ciclo de secagem em estufa?")
 
             st.markdown("<h3 style='color: #ff9800; margin-top: 20px;'>3. Registro Fotográfico</h3>", unsafe_allow_html=True)
-            fotos_anexadas = st.file_uploader(
-                "Anexe as fotos da peritagem (Múltiplos arquivos permitidos)", 
-                type=["png", "jpg", "jpeg"], 
-                accept_multiple_files=True
-            )
-            
+            fotos_anexadas = st.file_uploader("Anexe as fotos da peritagem", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # Botão de submissão do formulário
             submit_peritagem = st.form_submit_button("💾 Salvar Peritagem e Gerar PDF", type="primary")
             
             if submit_peritagem:
-                # BOAS PRÁTICAS: Amortecedor de Validação de Dados
                 if not notas_visuais.strip():
                     st.error("⚠️ As notas de inspeção visual são obrigatórias.")
                 elif len(fotos_anexadas) == 0:
@@ -331,7 +257,6 @@ elif st.session_state['modulo_ativo'] == 'Peritagem':
                         "estufa": requer_estufa,
                     }
                     
-                    # Fluxo de Integração com feedback visual
                     try:
                         with st.spinner("📄 Gerando Laudo em PDF..."):
                             pdf_bytes = gerar_pdf_peritagem(dados_compilados)
@@ -341,19 +266,17 @@ elif st.session_state['modulo_ativo'] == 'Peritagem':
                             
                         with st.spinner("📊 Movendo card e atualizando Google Sheets..."):
                             mover_linha_sheets(dados_compilados['id'])
+                            carregar_dados_pendentes.clear() # Limpa o cache para forçar a atualização da tela
                             
-                        # Limpa o estado e exibe o sucesso
                         st.success(f"✅ Peritagem da ID {dados_compilados['id']} concluída com sucesso!")
-                        st.markdown(f"**Arquivos salvos na pasta do Drive:** [Acessar Pasta]({link_pasta})")
+                        st.markdown(f"**Arquivos salvos no Drive:** [Acessar Arquivo]({link_pasta})")
                         
-                        # Retorna para a lista após 3 segundos
                         time.sleep(3)
                         st.session_state['etapa_peritagem'] = 'lista_ids'
                         st.session_state['id_selecionado'] = None
                         st.rerun()
                         
                     except Exception as e:
-                        # Amortecedor Crítico: Captura falhas de API sem quebrar a tela vermelha do Streamlit
                         st.error(f"❌ Ocorreu um erro durante a integração: {str(e)}")
                         st.info("Os dados do formulário foram mantidos. Tente submeter novamente.")
 
