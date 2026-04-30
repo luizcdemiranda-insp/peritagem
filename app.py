@@ -125,8 +125,8 @@ def mover_linha_sheets(id_pipedrive):
     aba_pendentes = doc.worksheet(NOME_ABA_PENDENTES)
     aba_concluidos = doc.worksheet(NOME_ABA_CONCLUIDOS)
     
-    # Amortecedor: Encontrar a linha baseada no ID e mover
-    cell = aba_pendentes.find(id_pipedrive)
+    # Amortecedor de Tipagem: Garante que a busca seja em formato texto
+    cell = aba_pendentes.find(str(id_pipedrive))
     if cell:
         linha_dados = aba_pendentes.row_values(cell.row)
         aba_concluidos.append_row(linha_dados)
