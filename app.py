@@ -9,8 +9,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
 # --- IDs DOS REPOSITÓRIOS ---
-DRIVE_FOLDER_ID = '1IOCs6mhGqX8Jgt0JnAHpTRtTYn1_Y8M6'
-SHEET_ID = '1LD0s8o8kb3bYE5couyA72B0r7W4sggl3'
+DRIVE_FOLDER_ID = '15QEhRK73JSdpw_-vcwsiHF6uF7oGDxQi'
+SHEET_ID = '1UoaCSwkFaVoYuAW__VwBordISIaCq2mIR_3b5onTS3I'
 NOME_ABA_PENDENTES = 'Pendentes' # Ajuste para o nome real da sua aba
 NOME_ABA_CONCLUIDOS = 'Concluidos' # Ajuste para o nome real da sua aba
 
