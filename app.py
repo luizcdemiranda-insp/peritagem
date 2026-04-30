@@ -9,7 +9,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
 # --- IDs DOS REPOSITÓRIOS ---
-DRIVE_FOLDER_ID = '15QEhRK73JSdpw_-vcwsiHF6uF7oGDxQi'
+DRIVE_FOLDER_ID = '0AHotVXWeWYP7Uk9PVA'
 SHEET_ID = '1UoaCSwkFaVoYuAW__VwBordISIaCq2mIR_3b5onTS3I'
 NOME_ABA_PENDENTES = 'Pendentes' # Ajuste para o nome real da sua aba
 NOME_ABA_CONCLUIDOS = 'Concluidos' # Ajuste para o nome real da sua aba
@@ -87,9 +87,15 @@ def upload_para_drive(id_pipedrive, pdf_bytes):
     creds = get_google_credentials()
     service = build('drive', 'v3', credentials=creds)
     
-    # Amortecedor de Busca: Tenta achar a pasta com o nome da ID criada pela Pluga
+    # Amortecedor de Busca atualizado para suportar Drives Compartilhados (Shared Drives)
     query = f"name='{id_pipedrive}' and '{DRIVE_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
-    results = service.files().list(q=query, fields="files(id, name)").execute()
+    results = service.files().list(
+        q=query, 
+        fields="files(id, name)",
+        includeItemsFromAllDrives=True, # FLAG OBRIGATÓRIA PARA WORKSPACE
+        supportsAllDrives=True          # FLAG OBRIGATÓRIA PARA WORKSPACE
+    ).execute()
+    
     items = results.get('files', [])
     
     # Se achar a subpasta, salva nela. Se não achar, salva na pasta raiz fornecida.
@@ -100,7 +106,14 @@ def upload_para_drive(id_pipedrive, pdf_bytes):
         'parents': [pasta_destino]
     }
     media = MediaIoBaseUpload(io.BytesIO(pdf_bytes), mimetype='application/pdf', resumable=True)
-    file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+    
+    # Upload do arquivo com a permissão corporativa
+    file = service.files().create(
+        body=file_metadata, 
+        media_body=media, 
+        fields='id, webViewLink',
+        supportsAllDrives=True # FLAG OBRIGATÓRIA PARA WORKSPACE
+    ).execute()
     
     return file.get('webViewLink')
 
